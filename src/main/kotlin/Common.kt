@@ -1,20 +1,18 @@
 package com.fxynos.multiprocessing.lab1
 
-import nu.pattern.OpenCV
 import org.opencv.core.Mat
-import org.opencv.imgcodecs.Imgcodecs
 
-fun main() {
-    OpenCV.loadLocally()
+/**
+ * Buffer of [mat] size
+ */
+fun createBuffer(mat: Mat) = ByteArray(mat.rows() * mat.cols() * mat.channels())
 
-    val startMs = System.currentTimeMillis()
-    fun log(msg: String) = println("[${System.currentTimeMillis() - startMs} ms] $msg")
-
-    val mat: Mat = Imgcodecs.imread("C:\\Program Files (x86)\\Steam\\userdata\\1103990303\\760\\remote\\305620\\screenshots\\20250914161938_1.jpg")
-    log("Image loaded: ${mat.cols()}x${mat.rows()}, ${mat.channels()} channels")
-
-    val buffer = ByteArray(mat.rows() * mat.cols() * mat.channels())
+/**
+ * [mat] with 3 channels
+ */
+fun editFrame(mat: Mat, buffer: ByteArray) {
     mat.get(0, 0, buffer)
+
     for (i in 0 until mat.rows())
         for (j in 0 until mat.cols()) {
             val index = (i * mat.cols() + j) * mat.channels()
@@ -26,11 +24,6 @@ fun main() {
             buffer[index + 1] = green.toByte()
             buffer[index] = (blue * 0.5).coerceAtLeast(0.0).toInt().toByte()
         }
-    log("Buffered image edited")
 
     mat.put(0, 0, buffer)
-    log("Image updated")
-
-    Imgcodecs.imwrite("./output.jpg", mat)
-    log("Image saved")
 }
