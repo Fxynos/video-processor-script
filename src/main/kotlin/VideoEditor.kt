@@ -1,5 +1,8 @@
 package com.fxynos.multiprocessing.lab1
 
+import com.fxynos.multiprocessing.lab1.common.FrameEditor
+import com.fxynos.multiprocessing.lab1.common.RgbFilterFrameEditor
+import com.fxynos.multiprocessing.lab1.common.SingleSizeFrameBufferSupplier
 import nu.pattern.OpenCV
 import org.opencv.core.Mat
 import org.opencv.core.Size
@@ -31,11 +34,16 @@ fun main() {
     )
     log("Video loaded: ${width}x$height, ${String.format("%.2f", frameCount / fps)} seconds")
 
+    val editor: FrameEditor = RgbFilterFrameEditor(
+        SingleSizeFrameBufferSupplier(),
+        1.5f,
+        1f,
+        0.5f
+    )
     var framesProcessed = 0
     val mat = Mat()
-    val buffer: ByteArray by lazy { createBuffer(mat) }
     while (capture.read(mat)) {
-        editFrame(mat, buffer)
+        editor.edit(mat)
         output.write(mat)
         log("${++framesProcessed} frames processed")
     }
