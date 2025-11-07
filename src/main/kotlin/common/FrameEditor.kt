@@ -1,24 +1,54 @@
 package com.fxynos.multiprocessing.lab1.common
 
 import org.opencv.core.Mat
+import java.util.LinkedList
 
 abstract class FrameEditor(val bufferSupplier: FrameBufferSupplier) {
     fun edit(frame: Mat) {
         val buffer = bufferSupplier.supply(frame)
         frame.get(0, 0, buffer)
-        editBuffered(
-            buffer,
+        editBuffered(BgrBufferedFrameCursor(
+            buffer = buffer,
             rows = frame.rows(),
-            cols = frame.cols(),
+            columns = frame.cols(),
             channels = frame.channels()
-        )
+        ))
         frame.put(0, 0, buffer)
     }
 
-    protected abstract fun editBuffered(buffer: ByteArray, rows: Int, cols: Int, channels: Int)
+    protected abstract fun editBuffered(cursor: FrameCursor)
 }
 
-class RgbFilterFrameEditor(
+/**
+ * Edit frame ignoring rectangle areas that >= [minArea]
+ * and satisfy color range: [redIgnoredRange], [greenIgnoredRange], [blueIgnoredRange]
+ */
+//class ConvolutionWithRectangleColorFilterFrameEditor(
+//    bufferSupplier: FrameBufferSupplier,
+//
+//    val minArea: Int,
+//    val redIgnoredRange: IntRange,
+//    val greenIgnoredRange: IntRange,
+//    val blueIgnoredRange: IntRange
+//) : FrameEditor(bufferSupplier) {
+//
+//    override fun editBuffered(cursor: FrameCursor) {
+//        TODO("Not yet implemented")
+//    }
+//
+//    private fun getIgnoredAreas(buffer): List<IgnoredArea> {
+//        val ignoredAreas = LinkedList<IgnoredArea>()
+//        for (row in )
+//    }
+//
+//    private data class IgnoredArea(val rows: IntRange, val cols: IntRange)
+//    private data class PixelPosition(val row: Int, val column: Int)
+//}
+
+/**
+ * Apply color filter by multiplying RGB channels
+ */
+class RgbFrameEditor(
     bufferSupplier: FrameBufferSupplier,
 
     val redCoefficient: Float,
@@ -26,25 +56,19 @@ class RgbFilterFrameEditor(
     val blueCoefficient: Float
 ) : FrameEditor(bufferSupplier) {
     companion object {
-        private fun multiplyChannelAndCastToByte(value: Int, coefficient: Float): Byte =
-            (value * coefficient)
+        private infix fun Int.channelMultipliedBy(coefficient: Float) =
+            (this * coefficient)
                 .coerceIn(0f, 255f)
                 .toInt()
-                .toByte()
     }
 
-    override fun editBuffered(buffer: ByteArray, rows: Int, cols: Int, channels: Int) {
-        for (i in 0 until rows)
-            for (j in 0 until cols) {
-                val index = (i * cols + j) * channels
-                // get channels values in 0..255 as int
-                val red: Int = buffer[index + 2].toInt() and 0xFF // OpenCV uses BGR ordering
-                val green: Int = buffer[index + 1].toInt() and 0xFF
-                val blue: Int = buffer[index].toInt() and 0xFF
-
-                buffer[index + 2] = multiplyChannelAndCastToByte(red, redCoefficient)
-                buffer[index + 1] = multiplyChannelAndCastToByte(green, greenCoefficient)
-                buffer[index] = multiplyChannelAndCastToByte(blue, blueCoefficient)
+    override fun editBuffered(cursor: FrameCursor) {
+        for (row in 0 until cursor.rows)
+            for (column in 0 until cursor.columns) {
+                cursor.moveTo(row, column)
+                cursor.setRed(cursor.red channelMultipliedBy redCoefficient)
+                cursor.setGreen(cursor.green channelMultipliedBy greenCoefficient)
+                cursor.setBlue(cursor.blue channelMultipliedBy blueCoefficient)
             }
     }
 }

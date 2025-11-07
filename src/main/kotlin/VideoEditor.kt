@@ -1,7 +1,7 @@
 package com.fxynos.multiprocessing.lab1
 
 import com.fxynos.multiprocessing.lab1.common.FrameEditor
-import com.fxynos.multiprocessing.lab1.common.RgbFilterFrameEditor
+import com.fxynos.multiprocessing.lab1.common.RgbFrameEditor
 import com.fxynos.multiprocessing.lab1.common.SingleSizeFrameBufferSupplier
 import nu.pattern.OpenCV
 import org.opencv.core.Mat
@@ -110,7 +110,7 @@ private fun readChunk(
  * Updates content of input [frames]
  */
 private fun editChunk(frames: List<Mat>) {
-    val editor: FrameEditor = RgbFilterFrameEditor(
+    val editor: FrameEditor = RgbFrameEditor(
         SingleSizeFrameBufferSupplier(),
         1.5f,
         1f,
