@@ -4,6 +4,8 @@ package com.fxynos.multiprocessing.lab1.common
  * Colored frame cursor
  */
 interface FrameCursor {
+    val row: Int
+    val column: Int
     val rows: Int
     val columns: Int
 
@@ -26,8 +28,10 @@ class BgrBufferedFrameCursor(
     override val rows: Int,
     override val columns: Int
 ) : FrameCursor {
-    private var row = 0
-    private var column  = 0
+    override var row = 0
+        private set
+    override var column = 0
+        private set
 
     private val baseIndex: Int get() = (row * columns + column) * channels
     private val redChannelIndex: Int get() = baseIndex + 2
