@@ -1,5 +1,6 @@
 package com.fxynos.multiprocessing.lab1
 
+import com.fxynos.multiprocessing.lab1.common.ConvolutionWithRectangleColorFilterFrameEditor
 import com.fxynos.multiprocessing.lab1.common.FrameEditor
 import com.fxynos.multiprocessing.lab1.common.RgbFrameEditor
 import com.fxynos.multiprocessing.lab1.common.SingleSizeFrameBufferSupplier
@@ -110,11 +111,17 @@ private fun readChunk(
  * Updates content of input [frames]
  */
 private fun editChunk(frames: List<Mat>) {
-    val editor: FrameEditor = RgbFrameEditor(
-        SingleSizeFrameBufferSupplier(),
-        1.5f,
-        1f,
-        0.5f
+    val editor: FrameEditor = ConvolutionWithRectangleColorFilterFrameEditor(
+        bufferSupplier = SingleSizeFrameBufferSupplier(),
+        minArea = 50,
+        redIgnoredRange = 200..255,
+        greenIgnoredRange = 200..255,
+        blueIgnoredRange = 200..255,
+        convolutionMatrix = arrayOf(
+            intArrayOf(1, 1, 1),
+            intArrayOf(1, 1, 1),
+            intArrayOf(1, 1, 1)
+        )
     )
     frames.map { editor.edit(it) }
 }

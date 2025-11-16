@@ -29,7 +29,8 @@ abstract class FrameEditor(val bufferSupplier: FrameBufferSupplier) {
 
 /**
  * Edit frame ignoring rectangle areas that >= [minArea]
- * and satisfy color range: [redIgnoredRange], [greenIgnoredRange], [blueIgnoredRange]
+ * and satisfy color range: [redIgnoredRange], [greenIgnoredRange], [blueIgnoredRange].
+ * The [convolutionMatrix] is matrix 3x3.
  */
 class ConvolutionWithRectangleColorFilterFrameEditor(
     bufferSupplier: FrameBufferSupplier,
@@ -37,7 +38,8 @@ class ConvolutionWithRectangleColorFilterFrameEditor(
     val minArea: Int,
     val redIgnoredRange: IntRange,
     val greenIgnoredRange: IntRange,
-    val blueIgnoredRange: IntRange
+    val blueIgnoredRange: IntRange,
+    val convolutionMatrix: Array<IntArray>
 ) : FrameEditor(bufferSupplier) {
 
     private val FrameCursor.isPixelSatisfiesIgnoreCondition: Boolean
@@ -47,7 +49,37 @@ class ConvolutionWithRectangleColorFilterFrameEditor(
         editBufferedIgnoringAreas(cursor, getIgnoredAreas(cursor))
 
     private fun editBufferedIgnoringAreas(cursor: FrameCursor, areas: List<IgnoredArea>) {
-        TODO()
+        for (row in 0 until cursor.rows)
+            for (column in 0 until cursor.columns)
+                if (areas.none { it.contains(row, column) }) {
+                    cursor.moveTo(row, column)
+                    cursor.applyConvolutionToCurrentPosition()
+                }
+    }
+
+    @Synchronized
+    private fun FrameCursor.applyConvolutionToCurrentPosition() {
+        val targetRow = row
+        val targetColumn = column
+
+        val convolutionDiv: Int = convolutionMatrix.sumOf(IntArray::sum)
+        var convolutionSumRed = 0
+        var convolutionSumGreen = 0
+        var convolutionSumBlue = 0
+        for (rowDelta in (-1) .. 1)
+            for (columnDelta in (-1) .. 1) {
+                moveTo( // mirror neighboring pixels if index out of bounds
+                    row = (targetRow + rowDelta).coerceIn(0, rows - 1),
+                    column = (targetColumn + columnDelta).coerceIn(0, column - 1)
+                )
+                convolutionSumRed += red * convolutionMatrix[rowDelta + 1][columnDelta + 1]
+                convolutionSumGreen += green * convolutionMatrix[rowDelta + 1][columnDelta + 1]
+                convolutionSumBlue += blue * convolutionMatrix[rowDelta + 1][columnDelta + 1]
+            }
+        moveTo(targetRow, targetColumn)
+        setRed(convolutionSumRed / convolutionDiv)
+        setGreen(convolutionSumRed / convolutionDiv)
+        setBlue(convolutionSumRed / convolutionDiv)
     }
 
     private fun getIgnoredAreas(cursor: FrameCursor): List<IgnoredArea> {
