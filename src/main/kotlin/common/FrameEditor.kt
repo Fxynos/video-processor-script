@@ -3,13 +3,6 @@ package com.fxynos.multiprocessing.lab1.common
 import org.opencv.core.Mat
 import java.util.LinkedList
 import kotlin.collections.ArrayDeque
-import kotlin.collections.List
-import kotlin.collections.asSequence
-import kotlin.collections.filter
-import kotlin.collections.isNotEmpty
-import kotlin.collections.listOf
-import kotlin.collections.none
-import kotlin.collections.plusAssign
 
 abstract class FrameEditor(val bufferSupplier: FrameBufferSupplier) {
     fun edit(frame: Mat) {
@@ -57,7 +50,6 @@ class ConvolutionWithRectangleColorFilterFrameEditor(
                 }
     }
 
-    @Synchronized
     private fun FrameCursor.applyConvolutionToCurrentPosition() {
         val targetRow = row
         val targetColumn = column
@@ -94,10 +86,9 @@ class ConvolutionWithRectangleColorFilterFrameEditor(
         return ignoredAreas.filter { it.area >= minArea }
     }
 
-    @Synchronized
     private fun getIgnoredArea(cursor: FrameCursor, startRow: Int, startColumn: Int): IgnoredArea {
-        fun Int.row() = this / cursor.rows
-        fun Int.column() = this % cursor.rows
+        fun Int.row() = this / cursor.columns
+        fun Int.column() = this % cursor.columns
         fun position(row: Int, column: Int) = row * cursor.columns + column
 
         val areaPixels = LinkedList<Int>() // item = row * cols + column

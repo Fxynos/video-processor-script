@@ -1,9 +1,10 @@
 package com.fxynos.multiprocessing.lab1
 
 import com.fxynos.multiprocessing.lab1.common.ConvolutionWithRectangleColorFilterFrameEditor
+import com.fxynos.multiprocessing.lab1.common.FrameBufferSupplier
 import com.fxynos.multiprocessing.lab1.common.FrameEditor
-import com.fxynos.multiprocessing.lab1.common.RgbFrameEditor
 import com.fxynos.multiprocessing.lab1.common.SingleSizeFrameBufferSupplier
+import com.fxynos.multiprocessing.lab1.common.ThreadLocalFrameBufferSupplier
 import nu.pattern.OpenCV
 import org.opencv.core.Mat
 import org.opencv.core.Size
@@ -13,7 +14,9 @@ import org.opencv.videoio.Videoio
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.decrementAndFetch
 
 private const val THREADS_COUNT_READ = 4
 private const val THREADS_COUNT_EDIT = 32
@@ -32,7 +35,7 @@ fun main() {
     val height: Int = capture.get(Videoio.CAP_PROP_FRAME_HEIGHT).toInt()
     val fps = capture.get(Videoio.CAP_PROP_FPS)
     val frameCount = capture.get(Videoio.CAP_PROP_FRAME_COUNT).toInt()
-    log("Video loaded: ${width}x$height, ${String.format("%.2f", frameCount / fps)} seconds")
+    log("Video loaded: ${width}x$height, ${String.format("%.2f", frameCount / fps)} seconds ($frameCount frames)")
 
     val executorService = Executors.newFixedThreadPool(maxOf(THREADS_COUNT_READ, THREADS_COUNT_EDIT))
     val readChunkSize: Int = frameCount / THREADS_COUNT_READ
@@ -55,19 +58,34 @@ fun main() {
     ).flatMap(Future<List<Mat>>::get)
     log("Frames are read")
 
-    val editChunkSize: Int = allFrames.size / THREADS_COUNT_EDIT
+    val editor: FrameEditor = ConvolutionWithRectangleColorFilterFrameEditor(
+        bufferSupplier = ThreadLocalFrameBufferSupplier(),
+        minArea = 300,
+        redIgnoredRange = 100..140,
+        greenIgnoredRange = 100..140,
+        blueIgnoredRange = 100..140,
+        convolutionMatrix = arrayOf(
+            intArrayOf(1, 1, 1),
+            intArrayOf(1, 1, 1),
+            intArrayOf(1, 1, 1)
+        )
+    )
+    val chunksCount = (THREADS_COUNT_EDIT * 10).coerceAtMost(frameCount)
+    val framesPerChunk: Int = frameCount / chunksCount
+    val processingFramesCount = AtomicInt(chunksCount)
+    log("Split to $chunksCount chunks: $framesPerChunk frames per chunk")
     executorService.invokeAll(
-        List(THREADS_COUNT_EDIT) { threadIndex ->
+        List(chunksCount) { threadIndex ->
             Callable {
                 log("Chunk $threadIndex is editing...")
-                editChunk(allFrames.subList(
-                    fromIndex = threadIndex * editChunkSize,
-                    toIndex = if (threadIndex == THREADS_COUNT_EDIT - 1)
+                allFrames.subList(
+                    fromIndex = threadIndex * framesPerChunk,
+                    toIndex = if (threadIndex == chunksCount - 1)
                         frameCount
                     else
-                        (threadIndex + 1) * editChunkSize
-                )) // change input frames
-                log("Chunk $threadIndex is edited")
+                        (threadIndex + 1) * framesPerChunk
+                ).forEach(editor::edit)
+                log("Chunk $threadIndex is edited: ${processingFramesCount.decrementAndFetch()} chunks left")
             }
         }
     )
@@ -105,23 +123,4 @@ private fun readChunk(
                 throw IndexOutOfBoundsException("Frame $frameIndex is out of bounds")
         }
     }
-}
-
-/**
- * Updates content of input [frames]
- */
-private fun editChunk(frames: List<Mat>) {
-    val editor: FrameEditor = ConvolutionWithRectangleColorFilterFrameEditor(
-        bufferSupplier = SingleSizeFrameBufferSupplier(),
-        minArea = 50,
-        redIgnoredRange = 200..255,
-        greenIgnoredRange = 200..255,
-        blueIgnoredRange = 200..255,
-        convolutionMatrix = arrayOf(
-            intArrayOf(1, 1, 1),
-            intArrayOf(1, 1, 1),
-            intArrayOf(1, 1, 1)
-        )
-    )
-    frames.map { editor.edit(it) }
 }
