@@ -1,9 +1,7 @@
 package com.fxynos.multiprocessing.lab1
 
 import com.fxynos.multiprocessing.lab1.common.ConvolutionWithRectangleColorFilterFrameEditor
-import com.fxynos.multiprocessing.lab1.common.FrameBufferSupplier
 import com.fxynos.multiprocessing.lab1.common.FrameEditor
-import com.fxynos.multiprocessing.lab1.common.SingleSizeFrameBufferSupplier
 import com.fxynos.multiprocessing.lab1.common.ThreadLocalFrameBufferSupplier
 import nu.pattern.OpenCV
 import org.opencv.core.Mat
@@ -68,7 +66,8 @@ fun main() {
             intArrayOf(1, 1, 1),
             intArrayOf(1, 1, 1),
             intArrayOf(1, 1, 1)
-        )
+        ),
+        convolutionDiv = 9
     )
     val chunksCount = (THREADS_COUNT_EDIT * 10).coerceAtMost(frameCount)
     val framesPerChunk: Int = frameCount / chunksCount
@@ -88,7 +87,7 @@ fun main() {
                 log("Chunk $threadIndex is edited: ${processingFramesCount.decrementAndFetch()} chunks left")
             }
         }
-    )
+    ).forEach(Future<Unit>::get)
     log("Frames are edited")
 
     VideoWriter(

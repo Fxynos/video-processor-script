@@ -32,7 +32,8 @@ class ConvolutionWithRectangleColorFilterFrameEditor(
     val redIgnoredRange: IntRange,
     val greenIgnoredRange: IntRange,
     val blueIgnoredRange: IntRange,
-    val convolutionMatrix: Array<IntArray>
+    val convolutionMatrix: Array<IntArray>,
+    val convolutionDiv: Int
 ) : FrameEditor(bufferSupplier) {
 
     private val FrameCursor.isPixelSatisfiesIgnoreCondition: Boolean
@@ -54,24 +55,25 @@ class ConvolutionWithRectangleColorFilterFrameEditor(
         val targetRow = row
         val targetColumn = column
 
-        val convolutionDiv: Int = convolutionMatrix.sumOf(IntArray::sum)
         var convolutionSumRed = 0
         var convolutionSumGreen = 0
         var convolutionSumBlue = 0
+
         for (rowDelta in (-1) .. 1)
             for (columnDelta in (-1) .. 1) {
                 moveTo( // mirror neighboring pixels if index out of bounds
                     row = (targetRow + rowDelta).coerceIn(0, rows - 1),
-                    column = (targetColumn + columnDelta).coerceIn(0, column - 1)
+                    column = (targetColumn + columnDelta).coerceIn(0, columns - 1)
                 )
                 convolutionSumRed += red * convolutionMatrix[rowDelta + 1][columnDelta + 1]
                 convolutionSumGreen += green * convolutionMatrix[rowDelta + 1][columnDelta + 1]
                 convolutionSumBlue += blue * convolutionMatrix[rowDelta + 1][columnDelta + 1]
             }
+
         moveTo(targetRow, targetColumn)
         setRed(convolutionSumRed / convolutionDiv)
-        setGreen(convolutionSumRed / convolutionDiv)
-        setBlue(convolutionSumRed / convolutionDiv)
+        setGreen(convolutionSumGreen / convolutionDiv)
+        setBlue(convolutionSumBlue / convolutionDiv)
     }
 
     private fun getIgnoredAreas(cursor: FrameCursor): List<IgnoredArea> {
@@ -85,6 +87,7 @@ class ConvolutionWithRectangleColorFilterFrameEditor(
                 }
         return ignoredAreas.filter { it.area >= minArea }
     }
+
 
     private fun getIgnoredArea(cursor: FrameCursor, startRow: Int, startColumn: Int): IgnoredArea {
         fun Int.row() = this / cursor.columns
