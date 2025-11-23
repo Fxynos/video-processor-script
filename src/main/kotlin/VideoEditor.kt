@@ -18,7 +18,7 @@ import kotlin.concurrent.atomics.decrementAndFetch
 
 private const val THREADS_COUNT_READ = 4
 private const val THREADS_COUNT_EDIT = 32
-private const val VID_SRC_FILE_PATH = "C:\\Users\\Fxynos\\Downloads\\mp lab video\\Cat brain failure 120s.mp4"
+private const val VID_SRC_FILE_PATH = "C:\\Users\\Fxynos\\Downloads\\mp lab video\\The-Long-Dark-Intro-First-Aid-Kit_1080p.mp4"
 private const val VID_DEST_FILE_PATH = "output.mp4"
 
 @OptIn(ExperimentalAtomicApi::class)
@@ -58,16 +58,17 @@ fun main() {
 
     val editor: FrameEditor = ConvolutionWithRectangleColorFilterFrameEditor(
         bufferSupplier = ThreadLocalFrameBufferSupplier(),
-        minArea = 300,
-        redIgnoredRange = 100..140,
-        greenIgnoredRange = 100..140,
-        blueIgnoredRange = 100..140,
+        minArea = 100,
+        redIgnoredRange = 50..100,
+        greenIgnoredRange = 20..60,
+        blueIgnoredRange = 50..100,
         convolutionMatrix = arrayOf(
-            intArrayOf(1, 1, 1),
-            intArrayOf(1, 1, 1),
-            intArrayOf(1, 1, 1)
-        ),
-        convolutionDiv = 9
+            intArrayOf(1,  4,  6,  4, 1),
+            intArrayOf(4, 16, 24, 16, 4),
+            intArrayOf(6, 24, 36, 24, 6),
+            intArrayOf(4, 16, 24, 16, 4),
+            intArrayOf(1,  4,  6,  4, 1)
+        )
     )
     val chunksCount = (THREADS_COUNT_EDIT * 10).coerceAtMost(frameCount)
     val framesPerChunk: Int = frameCount / chunksCount

@@ -23,7 +23,7 @@ abstract class FrameEditor(val bufferSupplier: FrameBufferSupplier) {
 /**
  * Edit frame ignoring rectangle areas that >= [minArea]
  * and satisfy color range: [redIgnoredRange], [greenIgnoredRange], [blueIgnoredRange].
- * The [convolutionMatrix] is matrix 3x3.
+ * The [convolutionMatrix] is matrix NxN where N is odd.
  */
 class ConvolutionWithRectangleColorFilterFrameEditor(
     bufferSupplier: FrameBufferSupplier,
@@ -33,9 +33,9 @@ class ConvolutionWithRectangleColorFilterFrameEditor(
     val greenIgnoredRange: IntRange,
     val blueIgnoredRange: IntRange,
     val convolutionMatrix: Array<IntArray>,
-    val convolutionDiv: Int
+    val convolutionDiv: Int = convolutionMatrix.sumOf(IntArray::sum)
 ) : FrameEditor(bufferSupplier) {
-
+    private val matrixRadius = convolutionMatrix.size / 2
     private val FrameCursor.isPixelSatisfiesIgnoreCondition: Boolean
         get() = red in redIgnoredRange && green in greenIgnoredRange && blue in blueIgnoredRange
 
@@ -59,15 +59,15 @@ class ConvolutionWithRectangleColorFilterFrameEditor(
         var convolutionSumGreen = 0
         var convolutionSumBlue = 0
 
-        for (rowDelta in (-1) .. 1)
-            for (columnDelta in (-1) .. 1) {
+        for (rowDelta in (-matrixRadius) .. matrixRadius)
+            for (columnDelta in (-matrixRadius) .. matrixRadius) {
                 moveTo( // mirror neighboring pixels if index out of bounds
                     row = (targetRow + rowDelta).coerceIn(0, rows - 1),
                     column = (targetColumn + columnDelta).coerceIn(0, columns - 1)
                 )
-                convolutionSumRed += red * convolutionMatrix[rowDelta + 1][columnDelta + 1]
-                convolutionSumGreen += green * convolutionMatrix[rowDelta + 1][columnDelta + 1]
-                convolutionSumBlue += blue * convolutionMatrix[rowDelta + 1][columnDelta + 1]
+                convolutionSumRed += red * convolutionMatrix[rowDelta + matrixRadius][columnDelta + matrixRadius]
+                convolutionSumGreen += green * convolutionMatrix[rowDelta + matrixRadius][columnDelta + matrixRadius]
+                convolutionSumBlue += blue * convolutionMatrix[rowDelta + matrixRadius][columnDelta + matrixRadius]
             }
 
         moveTo(targetRow, targetColumn)
