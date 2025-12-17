@@ -9,6 +9,10 @@ import org.opencv.core.Size
 import org.opencv.videoio.VideoCapture
 import org.opencv.videoio.VideoWriter
 import org.opencv.videoio.Videoio
+import java.io.BufferedOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.io.PrintStream
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -16,40 +20,87 @@ import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.decrementAndFetch
 
-private const val THREADS_COUNT_READ = 4
-private const val THREADS_COUNT_EDIT = 32
-private const val VID_SRC_FILE_PATH = "C:\\Users\\Fxynos\\Downloads\\mp lab video\\The-Long-Dark-Intro-First-Aid-Kit_1080p.mp4"
-private const val VID_DEST_FILE_PATH = "output.mp4"
-
 @OptIn(ExperimentalAtomicApi::class)
 fun main() {
     OpenCV.loadLocally()
+    val videos = arrayOf(
+        // TEST
+        //"input/CBF2_TEST.mp4",
 
-    val startMs = System.currentTimeMillis()
-    fun log(msg: String) = println("[${Thread.currentThread().name} ${System.currentTimeMillis() - startMs} ms] $msg")
+        // 360p
+        //"input/CBF30.mp4",
+        //"input/CBF60.mp4",
+        //"input/CBF120.mp4",
 
-    val capture = VideoCapture(VID_SRC_FILE_PATH)
+        // 720p
+        "input/ROE30.mp4",
+        "input/ROE60.mp4",
+        "input/ROE120.mp4",
+
+        // 1080p
+        "input/TLD30.mp4",
+        "input/TLD60.mp4",
+        "input/TLD120.mp4"
+    ).map(::File)
+    val cores = intArrayOf(
+        32,
+        24,
+        16,
+        12,
+        8
+    )
+    for (video in videos)
+        for (coreCount in cores) {
+            println("${video.name} $coreCount cores")
+            val outputName = "${video.name}_$coreCount"
+            val logWriter = PrintStream(BufferedOutputStream(FileOutputStream(File(
+                "logs",
+                "$outputName.txt"
+            ))))
+            val startMs = System.currentTimeMillis()
+            editVideo(
+                inputPath = video.absolutePath,
+                outputPath = File("output", video.name).absolutePath,
+                threadsRead = 4,
+                threadsEdit = coreCount
+            ) {
+                logWriter.println("[${Thread.currentThread().name} ${System.currentTimeMillis() - startMs} ms] $it")
+            }
+            logWriter.flush()
+            logWriter.close()
+        }
+}
+
+@OptIn(ExperimentalAtomicApi::class)
+private fun editVideo(
+    inputPath: String,
+    outputPath: String,
+    threadsRead: Int,
+    threadsEdit: Int,
+    log: (String) -> Unit
+) {
+    val capture = VideoCapture(inputPath)
     val width: Int = capture.get(Videoio.CAP_PROP_FRAME_WIDTH).toInt()
     val height: Int = capture.get(Videoio.CAP_PROP_FRAME_HEIGHT).toInt()
     val fps = capture.get(Videoio.CAP_PROP_FPS)
     val frameCount = capture.get(Videoio.CAP_PROP_FRAME_COUNT).toInt()
     log("Video loaded: ${width}x$height, ${String.format("%.2f", frameCount / fps)} seconds ($frameCount frames)")
 
-    val executorService = Executors.newFixedThreadPool(maxOf(THREADS_COUNT_READ, THREADS_COUNT_EDIT))
-    val readChunkSize: Int = frameCount / THREADS_COUNT_READ
+    val executorService = Executors.newFixedThreadPool(maxOf(threadsRead, threadsEdit))
+    val readChunkSize: Int = frameCount / threadsRead
     val allFrames: List<Mat> = executorService.invokeAll(
-        List(THREADS_COUNT_READ) { threadIndex ->
+        List(threadsRead) { threadIndex ->
             Callable {
                 log("Chunk $threadIndex is reading...")
                 val result = readChunk(
-                    videoFilePath = VID_SRC_FILE_PATH,
+                    videoFilePath = inputPath,
                     fromFrameInclusive = threadIndex * readChunkSize,
-                    toFrameExclusive = if (threadIndex == THREADS_COUNT_READ - 1)
-                            frameCount
-                        else
-                            (threadIndex + 1) * readChunkSize
+                    toFrameExclusive = if (threadIndex == threadsRead - 1)
+                        frameCount
+                    else
+                        (threadIndex + 1) * readChunkSize
                 )
-                log("Chunk $threadIndex is read")
+                log("Chunk $threadIndex is read: ${result.size} frames")
                 result
             }
         }
@@ -59,8 +110,8 @@ fun main() {
     val editor: FrameEditor = ConvolutionWithRectangleColorFilterFrameEditor(
         bufferSupplier = ThreadLocalFrameBufferSupplier(),
         minArea = 100,
-        redIgnoredRange = 50..100,
-        greenIgnoredRange = 20..60,
+        redIgnoredRange = 190..220,
+        greenIgnoredRange = 40..80,
         blueIgnoredRange = 50..100,
         convolutionMatrix = arrayOf(
             intArrayOf(1,  4,  6,  4, 1),
@@ -70,8 +121,9 @@ fun main() {
             intArrayOf(1,  4,  6,  4, 1)
         )
     )
-    val chunksCount = (THREADS_COUNT_EDIT * 10).coerceAtMost(frameCount)
-    val framesPerChunk: Int = frameCount / chunksCount
+    val actualFrameCount = allFrames.size // can differ from `frameCount`
+    val chunksCount = (threadsEdit * 10).coerceAtMost(actualFrameCount)
+    val framesPerChunk: Int = actualFrameCount / chunksCount
     val processingFramesCount = AtomicInt(chunksCount)
     log("Split to $chunksCount chunks: $framesPerChunk frames per chunk")
     executorService.invokeAll(
@@ -81,7 +133,7 @@ fun main() {
                 allFrames.subList(
                     fromIndex = threadIndex * framesPerChunk,
                     toIndex = if (threadIndex == chunksCount - 1)
-                        frameCount
+                        actualFrameCount
                     else
                         (threadIndex + 1) * framesPerChunk
                 ).forEach(editor::edit)
@@ -92,7 +144,7 @@ fun main() {
     log("Frames are edited")
 
     VideoWriter(
-        VID_DEST_FILE_PATH,
+        outputPath,
         capture.get(Videoio.CAP_PROP_FOURCC).toInt(), // mp4v
         fps,
         Size(
@@ -107,7 +159,7 @@ fun main() {
 
     allFrames.forEach(Mat::release)
     capture.release()
-    executorService.shutdown()
+    executorService.shutdownNow()
     log("Resources released")
 }
 
@@ -117,10 +169,13 @@ private fun readChunk(
     toFrameExclusive: Int
 ): List<Mat> = VideoCapture(videoFilePath).run {
     set(Videoio.CAP_PROP_POS_FRAMES, fromFrameInclusive.toDouble())
-    List(toFrameExclusive - fromFrameInclusive) { frameIndex ->
-        Mat().also {
-            if (!read(it))
-                throw IndexOutOfBoundsException("Frame $frameIndex is out of bounds")
-        }
+    val chunk = buildList {
+        for (i in fromFrameInclusive until toFrameExclusive)
+            Mat()
+                .takeIf(::read)
+                ?.apply(::add)
+                ?: break
     }
+    release()
+    chunk
 }
