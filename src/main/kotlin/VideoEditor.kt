@@ -24,13 +24,10 @@ import kotlin.concurrent.atomics.decrementAndFetch
 fun main() {
     OpenCV.loadLocally()
     val videos = arrayOf(
-        // TEST
-        //"input/CBF2_TEST.mp4",
-
         // 360p
-        //"input/CBF30.mp4",
-        //"input/CBF60.mp4",
-        //"input/CBF120.mp4",
+        "input/CBF30.mp4",
+        "input/CBF60.mp4",
+        "input/CBF120.mp4",
 
         // 720p
         "input/ROE30.mp4",
@@ -109,10 +106,10 @@ private fun editVideo(
 
     val editor: FrameEditor = ConvolutionWithRectangleColorFilterFrameEditor(
         bufferSupplier = ThreadLocalFrameBufferSupplier(),
-        minArea = 100,
-        redIgnoredRange = 190..220,
-        greenIgnoredRange = 40..80,
-        blueIgnoredRange = 50..100,
+        minArea = 5,
+        redIgnoredRange = 245..255,
+        greenIgnoredRange = 0..10,
+        blueIgnoredRange = 0..10,
         convolutionMatrix = arrayOf(
             intArrayOf(1,  4,  6,  4, 1),
             intArrayOf(4, 16, 24, 16, 4),
